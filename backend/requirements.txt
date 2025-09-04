@@ -1,0 +1,13 @@
+### Monolithic install file
+# This references split requirement sets. For quick dev use only base:
+#   pip install -r requirements-base.txt
+# Add ML stack later:
+#   pip install -r requirements-ml.txt
+# For everything at once (heavier):
+#   pip install -r requirements.txt
+
+-r requirements-base.txt
+-r requirements-ml.txt
+
+# Dev / test extras (can be moved to separate requirements-dev.txt later)
+pytest==8.2.2

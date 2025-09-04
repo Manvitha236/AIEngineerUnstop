@@ -1,0 +1,17 @@
+# Heavier ML / Vector / LLM dependencies (install only when needed)
+# (OpenAI removed; Gemini only implementation)
+scikit-learn==1.4.2
+numpy==1.26.4
+pandas==2.2.2
+sentence-transformers==2.2.2
+huggingface_hub==0.23.0
+langchain==0.2.0
+faiss-cpu==1.8.0
+redis==5.0.4
+celery==5.4.0
+faiss-cpu==1.8.0
+# Gemini (Google) LLM client
+google-generativeai==0.7.2
+# Optional: if you want local embedding alternatives / tokenizers
+# transformers==4.41.0
+# accelerate==0.30.0
