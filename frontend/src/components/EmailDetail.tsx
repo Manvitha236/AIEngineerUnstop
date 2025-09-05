@@ -38,7 +38,7 @@ export const EmailDetail: React.FC<{ id: number | null }> = ({ id }) => {
   });
   const [isRegenerating, setIsRegenerating] = useState(false);
 
-  if (!id) return <div className="detail">Select an email.</div>;
+  if (!id) return <div className="detail">Select an email from Sidebar.</div>;
   if (error) return <div className="detail" style={{color:'red', fontSize:'0.75rem'}}>
     Failed to load email (id={id}). <button onClick={()=>refetch()}>Retry</button>
     <br />{String((error as any).message || '')}
@@ -73,7 +73,7 @@ export const EmailDetail: React.FC<{ id: number | null }> = ({ id }) => {
   };
 
   return (
-    <div className="detail">
+    <div className="detail" style={{flex:1, display:'flex', flexDirection:'column', overflow:'auto'}}>
       <h3>{data.subject}</h3>
       <div className="meta" style={{alignItems:'center'}}>
         <span>{data.sender}</span>

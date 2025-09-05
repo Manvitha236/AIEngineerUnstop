@@ -92,6 +92,7 @@ export const Dashboard: React.FC = () => {
     } catch (e) { console.warn('Recompute failed', e); }
     finally { setTimeout(()=> setRecomputeRunning(false), 400); }
   };
+  const [showDashboard, setShowDashboard] = useState(false);
   return (
     <div className="layout">
       <aside className="sidebar">
@@ -164,12 +165,23 @@ export const Dashboard: React.FC = () => {
   <EmailList refreshKey={refreshKey} onSelect={setSelectedId} selectedId={selectedId} filters={{ priority: priorityFilter || undefined, sentiment: sentimentFilter || undefined, status: statusFilter || undefined, domain: domainFilter || undefined, fuzzy: fuzzy || undefined }} search={categoryFilter ? `${debounced} ${categoryFilter}`.trim() : debounced} page={page} pageSize={pageSize} onPageChange={setPage} />
       </aside>
       <main className="main">
-        <div style={{flex:1, display:'flex', flexDirection:'column', gap:'0.75rem', minHeight:0}}>
-          <div style={{flexBasis:'50vh', flexGrow:0, flexShrink:0, minHeight:0, display:'flex'}}>
+        <div style={{position:'relative', flex:1, display:'flex', flexDirection:'column', gap:'0.5rem', minHeight:0}}>
+          <div style={{flex:1, minHeight:0, display:'flex'}}>
             <EmailDetail id={selectedId} />
           </div>
-          <div style={{flex:1, minHeight:0, display:'flex'}}>
-            <AnalyticsPanel />
+          {!showDashboard && (
+            <div style={{display:'flex', justifyContent:'center', padding:'2px 0'}}>
+              <button className="dash-toggle-btn" onClick={()=> setShowDashboard(true)}>Click here to see dashboard</button>
+            </div>
+          )}
+          <div className={`dashboard-slide ${showDashboard? 'open':'closed'}`} style={{marginTop: showDashboard? '4px':'0'}}>
+            <div className="dashboard-header" style={{position:'relative', justifyContent:'center'}}>
+              <span style={{fontSize:'0.8rem', fontWeight:700, letterSpacing:'0.5px'}}>Dashboard</span>
+              <button aria-label="Hide dashboard" className="icon-btn" onClick={()=> setShowDashboard(false)} style={{position:'absolute', right:6, top:4}}>✕</button>
+            </div>
+            <div className="dashboard-body">
+              <AnalyticsPanel />
+            </div>
           </div>
         </div>
       </main>
