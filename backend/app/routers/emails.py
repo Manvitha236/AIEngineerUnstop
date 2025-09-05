@@ -17,7 +17,7 @@ from ..services.retrievers import fetch_any, gmail_diag
 from ..db.database import get_db
 from ..services.nlp import analyze_sentiment, determine_priority, extract_info
 from ..services.auto_responder import generate_response
-from ..services.auto_responder import ai_diagnostics, test_gemini
+from ..services.auto_responder import ai_diagnostics, test_llm
 from ..services.dataset_loader import load_dataset
 from ..security.api_key import get_api_key
 from ..core.events import broadcaster
@@ -158,6 +158,44 @@ def maintenance_reset_dataset(
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"Dataset file not found: {path}")
     return summary
+
+@router.post("/maintenance/strip-html", dependencies=[Depends(get_api_key)])
+def maintenance_strip_html(limit: int = 500, ids: str | None = None, db: Session = Depends(get_db)):
+    """Convert stored HTML bodies to plain text.
+    - limit: scan newest N (ignored if ids provided)
+    - ids: comma-separated list of specific email IDs to force reprocess
+    """
+    from ..models.email_model import Email
+    import re, html as _html
+    tag_re = re.compile(r'<[^>]+>')
+    rows = []
+    if ids:
+        id_list = [int(x) for x in ids.split(',') if x.strip().isdigit()]
+        if id_list:
+            rows = db.query(Email).filter(Email.id.in_(id_list)).all()
+    if not rows:
+        rows = db.query(Email).order_by(Email.id.desc()).limit(limit).all()
+    changed = 0
+    for e in rows:
+        b = e.body or ''
+        if not b:
+            continue
+        # Detect heavy HTML usage or presence of html/body/table tags
+        markers = sum(1 for mk in ('<html','<body','<table','<tr','<td','<div','<span','<p','<style','class=') if mk in b.lower())
+        tag_matches = tag_re.findall(b)
+        tag_ratio = (len(''.join(tag_matches)) / len(b)) if b else 0
+        if markers >= 2 or (len(tag_matches) > 8 and tag_ratio > 0.04):
+            txt = b
+            txt = re.sub(r'<\s*br\s*/?>', '\n', txt, flags=re.I)
+            txt = re.sub(r'</(p|div|tr|table|li|h[1-6])\s*>', '\n', txt, flags=re.I)
+            txt = tag_re.sub(' ', txt)
+            txt = _html.unescape(re.sub(r'\s+', ' ', txt)).strip()
+            if txt and txt != b:
+                e.body = txt
+                changed += 1
+    if changed:
+        db.commit()
+    return {"scanned": len(rows), "changed": changed, "ids": ids.split(',') if ids else None}
 
 
 def rag_status():  # pragma: no cover
@@ -478,7 +516,7 @@ def ai_diag():
 
 @router.get("/ai/test", dependencies=[Depends(get_api_key)])
 def ai_test():
-    return test_gemini()
+    return test_llm()
 
 @router.post("/maintenance/tag-unknown-as-demo", dependencies=[Depends(get_api_key)])
 def tag_unknown_as_demo(db: Session = Depends(get_db)):
