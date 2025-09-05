@@ -199,33 +199,3 @@ For billing queries, direct the customer to the billing portal and create a tick
 If a user cannot access their account, advise password reset or SSO health check.
 Critical outages should be escalated to the on-call engineer within 15 minutes.
 For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.
-If a user cannot access their account, advise password reset or SSO health check.
-Critical outages should be escalated to the on-call engineer within 15 minutes.
-For billing queries, direct the customer to the billing portal and create a ticket if unresolved.

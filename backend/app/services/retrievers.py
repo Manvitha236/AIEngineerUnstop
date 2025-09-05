@@ -98,7 +98,6 @@ def fetch_from_gmail(limit: int) -> List[Dict]:  # Gmail over IMAP with optional
                     sender = msg.get('From') or ''
                     date_hdr = msg.get('Date') or _now_iso()
                     body = ''
-                    html_candidate = ''
                     if msg.is_multipart():
                         for part in msg.walk():
                             ctype = part.get_content_type()
@@ -109,12 +108,6 @@ def fetch_from_gmail(limit: int) -> List[Dict]:  # Gmail over IMAP with optional
                                     body += part.get_payload(decode=True).decode(charset, errors='ignore')
                                 except Exception:
                                     pass
-                            elif ctype == 'text/html' and 'attachment' not in disp and not body:
-                                # keep as fallback only if no plain text collected
-                                try:
-                                    html_candidate = part.get_payload(decode=True).decode(part.get_content_charset() or 'utf-8', errors='ignore')
-                                except Exception:
-                                    pass
                     else:
                         charset = msg.get_content_charset() or 'utf-8'
                         payload = msg.get_payload(decode=True)
@@ -123,33 +116,6 @@ def fetch_from_gmail(limit: int) -> List[Dict]:  # Gmail over IMAP with optional
                                 body = payload.decode(charset, errors='ignore')
                             except Exception:
                                 body = ''
-                    import re, html as _html
-                    # If no text/plain but we have html part -> strip and use
-                    if not body and html_candidate:
-                        txt = html_candidate
-                        txt = re.sub(r'<\s*br\s*/?>', '\n', txt, flags=re.I)
-                        txt = re.sub(r'</(p|div|tr|table|li|h[1-6])\s*>', '\n', txt, flags=re.I)
-                        txt = re.sub(r'<[^>]+>', ' ', txt)
-                        txt = _html.unescape(re.sub(r'\s+', ' ', txt)).strip()
-                        body = txt
-                    # Some senders wrongly embed full HTML inside text/plain; broaden detection
-                    if body and '<' in body and '>' in body:
-                        tag_matches = re.findall(r'<[^>]{1,200}>', body)
-                        if tag_matches:
-                            tag_ratio = len(''.join(tag_matches)) / max(1, len(body))
-                            html_markers = 0
-                            for mk in ('<html','<body','<table','</tr','</td','<div','<!DOCTYPE','<span','<p','style=','class='):
-                                if mk.lower() in body.lower():
-                                    html_markers += 1
-                            # Strip if clear HTML structure OR density high
-                            if html_markers >= 2 or len(tag_matches) > 8 or tag_ratio > 0.04:
-                                txt = body
-                                txt = re.sub(r'<\s*br\s*/?>', '\n', txt, flags=re.I)
-                                txt = re.sub(r'</(p|div|tr|table|li|h[1-6])\s*>', '\n', txt, flags=re.I)
-                                txt = re.sub(r'<[^>]+>', ' ', txt)
-                                txt = _html.unescape(re.sub(r'\s+', ' ', txt)).strip()
-                                if txt and len(txt) > 5:
-                                    body = txt
                     mails.append({
                         'sender': sender,
                         'subject': subject,
