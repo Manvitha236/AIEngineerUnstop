@@ -22,7 +22,7 @@ def test_llm() -> dict:
             return {"ok": False, "provider": provider, "reason": "missing_api_key"}
         try:
             txt = _deepseek_call("Ping", test_mode=True)
-            return {"ok": True, "provider": provider, "text": (txt or '')[:120], "model": os.getenv('DEEPSEEK_MODEL','deepseek/deepseek-chat')}
+            return {"ok": True, "provider": provider, "text": (txt or '')[:120], "model": os.getenv('DEEPSEEK_MODEL','deepseek/deepseek-chat-v3.1:free-v3.1:free')}
         except Exception as e:  # pragma: no cover
             return {"ok": False, "provider": provider, "error_type": type(e).__name__, "error_message": str(e)}
     # gemini path
@@ -147,7 +147,7 @@ def _deepseek_call(prompt: str, test_mode: bool=False) -> str:
     api_key = os.getenv('OPENROUTER_API_KEY')
     if not api_key:
         raise RuntimeError('missing OPENROUTER_API_KEY')
-    model = os.getenv('DEEPSEEK_MODEL', 'deepseek/deepseek-chat')
+    model = os.getenv('DEEPSEEK_MODEL', 'deepseek/deepseek-chat-v3.1:free')
     endpoint = os.getenv('OPENROUTER_BASE', 'https://openrouter.ai/api/v1/chat/completions')
     timeout_s = float(os.getenv('DEEPSEEK_TIMEOUT', os.getenv('LLM_TIMEOUT', '10')))
     max_tokens = int(os.getenv('DEEPSEEK_MAX_TOKENS', '512'))
@@ -216,7 +216,7 @@ def _generate_deepseek(subject: str, body: str, sentiment: str, priority: str, r
         LAST_DEEPSEEK_ERROR = {
             'error_type': type(e).__name__,
             'error_message': str(e),
-            'model': os.getenv('DEEPSEEK_MODEL','deepseek/deepseek-chat'),
+            'model': os.getenv('DEEPSEEK_MODEL','deepseek/deepseek-chat-v3.1:free'),
             'ts': __import__('datetime').datetime.now(__import__('datetime').timezone.utc).timestamp()
         }
         log.error('DeepSeek generation failed', exc_info=e, extra={k:v for k,v in LAST_DEEPSEEK_ERROR.items() if k!='prompt_chars'})
@@ -236,7 +236,7 @@ def ai_diagnostics() -> Dict[str, Any]:  # pragma: no cover
     }
     if provider.startswith('deepseek') or provider in {'openrouter','or'}:
         base.update({
-            'model': os.getenv('DEEPSEEK_MODEL','deepseek/deepseek-chat'),
+            'model': os.getenv('DEEPSEEK_MODEL','deepseek/deepseek-chat-v3.1:free'),
             'has_key': bool(os.getenv('OPENROUTER_API_KEY')),
             'last_error': LAST_DEEPSEEK_ERROR,
             'timeout_default_s': float(os.getenv('DEEPSEEK_TIMEOUT', os.getenv('LLM_TIMEOUT','10')))

@@ -1,9 +1,9 @@
 import React from 'react';
 import { useQuery } from 'react-query';
 import axios from 'axios';
-import { Bar } from 'react-chartjs-2';
-import { Chart, CategoryScale, LinearScale, BarElement, Tooltip, Legend } from 'chart.js';
-Chart.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
+import { Bar, Doughnut } from 'react-chartjs-2';
+import { Chart, CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend } from 'chart.js';
+Chart.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend);
 
 interface Summary {
   total: number;
@@ -57,19 +57,42 @@ export const AnalyticsPanel: React.FC = () => {
           </div>
           <div style={{position:'relative', flex:1, minWidth:0}}>
             <div style={{fontSize:'0.6rem', fontWeight:600, marginBottom:4}}>Priority</div>
-            <div style={{position:'absolute', inset: '18px 4px 4px 4px'}}>
-              <Bar
+            <div style={{position:'absolute', inset: '4px 4px 4px 4px', display:'flex', alignItems:'center', justifyContent:'center'}}>
+              <Doughnut
                 data={{
                   labels: priorityLabels,
                   datasets: [{
                     label: 'Priority',
                     data: priorityValues,
-                    backgroundColor: ['#dc2626','#2563eb']
+                    backgroundColor: priorityLabels.map(l => l === 'Urgent' ? '#dc2626' : '#2563eb'),
+                    borderWidth: 0,
+                    hoverOffset: 4
                   }]
                 }}
-                options={{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, animation:false, scales:{x:{ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}}, beginAtZero:true}}}}
+                options={{
+                  responsive:true,
+                  maintainAspectRatio:false,
+                  cutout:'55%',
+                  plugins:{
+                    legend:{display:true, position:'bottom', labels:{boxWidth:10, font:{size:9}}},
+                    tooltip:{callbacks:{label: (ctx)=> `${ctx.label}: ${ctx.raw}`}}
+                  },
+                  animation:false
+                }}
               />
               {priorityValues.every(v=>v===0) && <div style={{position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'0.55rem', color:'#64748b', pointerEvents:'none'}}>No priority data</div>}
+              {!priorityValues.every(v=>v===0) && (
+                <div style={{position:'absolute', fontSize:'0.55rem', textAlign:'center', lineHeight:1.2, color:'#334155'}}>
+                  {(() => {
+                    const total = priorityValues.reduce((a,b)=>a+b,0);
+                    if (!total) return '';
+                    const urgentIdx = priorityLabels.findIndex(l=>l==='Urgent');
+                    const urgent = urgentIdx>=0 ? priorityValues[urgentIdx] : 0;
+                    const pct = total ? Math.round((urgent/total)*100) : 0;
+                    return `Urgent\n${pct}%`;
+                  })()}
+                </div>
+              )}
             </div>
           </div>
         </div>
