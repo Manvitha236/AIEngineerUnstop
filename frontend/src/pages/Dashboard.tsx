@@ -9,9 +9,11 @@ import { EmailList } from '../components/EmailList';
 import { AnalyticsPanel } from '../components/AnalyticsPanel';
 import { EmailDetail } from '../components/EmailDetail';
 import { useState } from 'react';
+import { useQueryClient } from 'react-query';
 import './dashboard.css';
 
 export const Dashboard: React.FC = () => {
+  const qc = useQueryClient();
   // Configure axios once (could load from env via import.meta.env)
   useEffect(() => {
     if (!axios.defaults.headers.common['X-API-Key']) {
@@ -38,7 +40,6 @@ export const Dashboard: React.FC = () => {
   const [page, setPage] = useState(0);
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [domainFilter, setDomainFilter] = useState('');
-  const [fuzzy, setFuzzy] = useState(false);
   const [pageSize, setPageSize] = useState(10);
   useEffect(() => {
     const t = setTimeout(() => setDebounced(search), 350);
@@ -68,6 +69,11 @@ export const Dashboard: React.FC = () => {
       await fetch(`/api/emails/fetch/mode?${params}`, { method:'POST', headers:{ 'X-API-Key': apiKey }});
       setMode(next);
       setRefreshKey(k=>k+1);
+  // Make analytics refresh right away
+  qc.invalidateQueries(['analytics']);
+  // Reset selection and pagination to avoid stale IDs from previous mode
+  setSelectedId(null);
+  setPage(0);
     } catch (e) { console.warn('Switch mode failed', e); }
   };
   const seedSamples = async () => {
@@ -121,9 +127,6 @@ export const Dashboard: React.FC = () => {
           </div>
           <div className="inline-group">
             <input placeholder="Domain (example.com)" value={domainFilter} onChange={e=> { setDomainFilter(e.target.value); setPage(0);} } style={{flex:1}} />
-            <label style={{fontSize:'0.6rem', display:'flex', alignItems:'center', gap:4}}>
-              <input type="checkbox" checked={fuzzy} onChange={e=> { setFuzzy(e.target.checked); setPage(0);} } /> Fuzzy
-            </label>
           </div>
           <div className="inline-group">
             <select value={priorityFilter} onChange={e => { setPriorityFilter(e.target.value); setPage(0);} } style={{flex:1}}>
@@ -162,7 +165,7 @@ export const Dashboard: React.FC = () => {
             </label>
           </div>
         </div>
-  <EmailList refreshKey={refreshKey} onSelect={setSelectedId} selectedId={selectedId} filters={{ priority: priorityFilter || undefined, sentiment: sentimentFilter || undefined, status: statusFilter || undefined, domain: domainFilter || undefined, fuzzy: fuzzy || undefined }} search={categoryFilter ? `${debounced} ${categoryFilter}`.trim() : debounced} page={page} pageSize={pageSize} onPageChange={setPage} />
+  <EmailList refreshKey={refreshKey} onSelect={setSelectedId} selectedId={selectedId} filters={{ priority: priorityFilter || undefined, sentiment: sentimentFilter || undefined, status: statusFilter || undefined, domain: domainFilter || undefined }} search={categoryFilter ? `${debounced} ${categoryFilter}`.trim() : debounced} page={page} pageSize={pageSize} onPageChange={setPage} />
       </aside>
       <main className="main">
         <div style={{position:'relative', flex:1, display:'flex', flexDirection:'column', gap:'0.5rem', minHeight:0}}>

@@ -211,7 +211,6 @@ def list_emails(
     search: Optional[str] = Query(None, description="Alias for q"),
     query: Optional[str] = Query(None, description="Alias for q"),
     domain: Optional[str] = Query(None, description="Filter by sender domain (example.com, @example.com, or fragment)"),
-    fuzzy: bool = Query(False, description="Apply lightweight token-all-must-match fuzzy on subject+body (post-filter)."),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     source: Optional[str] = Query(None, description="Filter by source (demo/gmail/imap)"),
@@ -247,9 +246,9 @@ def list_emails(
         # user explicitly requested a source; do not auto-exclude anything
         pass
     else:
-        # In live gmail mode hide demo by default
+        # In live gmail mode hide demo/unknown by default
         if runtime_provider == 'gmail':
-            exclude_sources = ['demo']
+            exclude_sources = ['demo', 'unknown']
 
     records, total = list_db_emails(
         db,
@@ -258,15 +257,11 @@ def list_emails(
         sentiment=sentiment,
         q_search=q,
         domain=domain,
-        fuzzy=fuzzy,
         limit=limit,
         offset=offset,
         source=source_filter,
         exclude_sources=exclude_sources
     )
-    # If fuzzy applied, adjust total to visible count
-    if fuzzy and q:
-        total = len(records)
     items: List[Dict[str, Any]] = []
     for r in records:
         items.append(EmailOut(
@@ -363,8 +358,17 @@ def regenerate_response(email_id: int, db: Session = Depends(get_db)):
     rag_results = []
     if rag_engine:
         rag_results = rag_engine.retrieve(record.subject + "\n" + record.body)
-    auto_resp = generate_response(record.subject, record.body, record.sentiment, record.priority, rag_results)
-    save_auto_response(db, record, auto_resp)
+    try:
+        auto_resp = generate_response(record.subject, record.body, record.sentiment, record.priority, rag_results)
+        save_auto_response(db, record, auto_resp)
+    except Exception as e:
+        # On rate limit or transient error, enqueue instead so response comes later without failing the request
+        msg = str(e)
+        try:
+            from ..services.queue_worker import enqueue_email  # local import to avoid cycle
+            enqueue_email(record.id, record.priority or 'Not urgent')
+        except Exception:
+            pass
     phones, alt_emails, keywords, requested_actions, sentiment_terms = extract_info(record.body)
     try:
         broadcaster.publish("email_updated", f"{{\"id\":{record.id},\"status\":\"{record.status}\"}}")
@@ -443,7 +447,8 @@ def _do_single_fetch(db: Session):
             for m in mails:
                 sentiment = analyze_sentiment(m['body'])
                 priority = determine_priority(m['body'])
-                auto_resp = generate_response(m['subject'], m['body'], sentiment, priority, [])
+                # Defer AI generation to worker to avoid bursts and ensure consistency
+                auto_resp = None
                 recv = _coerce_received(m.get('received_at'))
                 from ..services.email_service import email_exists_external, email_exists
                 ext_id = m.get('external_id')
@@ -451,7 +456,12 @@ def _do_single_fetch(db: Session):
                     continue
                 if not ext_id and email_exists(db, m['sender'], m['subject'], recv):
                     continue
-                create_email(db, EmailCreate(sender=m['sender'], subject=m['subject'], body=m['body'], received_at=recv), sentiment, priority, auto_resp, source=get_runtime_provider(), external_id=ext_id)
+                rec = create_email(db, EmailCreate(sender=m['sender'], subject=m['subject'], body=m['body'], received_at=recv), sentiment, priority, auto_resp, source=get_runtime_provider(), external_id=ext_id)
+                try:
+                    from ..services.queue_worker import enqueue_email
+                    enqueue_email(rec.id, priority)
+                except Exception:
+                    pass
                 created += 1
         return {"fetched": len(mails), "inserted": created}
     except Exception as e:
@@ -556,7 +566,7 @@ def get_fetch_mode():
     return {"provider": get_runtime_provider()}
 
 @router.post("/fetch/mode", dependencies=[Depends(get_api_key)])
-def set_fetch_mode(provider: str, reload_demo: bool = False, purge_demo: bool = True, db: Session = Depends(get_db)):
+def set_fetch_mode(provider: str, reload_demo: bool = False, purge_demo: bool = False, db: Session = Depends(get_db)):
     provider = provider.lower()
     if provider == 'demo':
         # Switch to demo: stop fetcher, set runtime provider to demo (no external fetch)
@@ -595,7 +605,8 @@ def set_fetch_mode(provider: str, reload_demo: bool = False, purge_demo: bool = 
             from ..services.email_service import create_email, email_exists, email_exists_external
             from ..schemas.email import EmailCreate
             from ..services.nlp import analyze_sentiment, determine_priority
-            from ..services.auto_responder import generate_response
+            # Use queue-based generation to avoid bursts/rate limits
+            from ..services.queue_worker import enqueue_email
             mails = fetch_any(limit=15)
             for m in mails:
                 recv = _coerce_received(m.get('received_at'))
@@ -606,8 +617,12 @@ def set_fetch_mode(provider: str, reload_demo: bool = False, purge_demo: bool = 
                     continue
                 sentiment = analyze_sentiment(m['body'])
                 priority = determine_priority(m['body'])
-                auto_resp = generate_response(m['subject'], m['body'], sentiment, priority, [])
-                create_email(db, EmailCreate(sender=m['sender'], subject=m['subject'], body=m['body'], received_at=recv), sentiment, priority, auto_resp, source='gmail', external_id=ext_id)
+                # Defer AI generation to worker
+                email_rec = create_email(db, EmailCreate(sender=m['sender'], subject=m['subject'], body=m['body'], received_at=recv), sentiment, priority, None, source='gmail', external_id=ext_id)
+                try:
+                    enqueue_email(email_rec.id, priority)
+                except Exception:
+                    pass
                 created += 1
         except Exception:
             created = -1

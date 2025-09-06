@@ -14,7 +14,7 @@ interface EmailRow {
 interface EmailListProps {
   onSelect: (id: number) => void;
   selectedId: number | null;
-  filters: { priority?: string; sentiment?: string; status?: string; domain?: string; fuzzy?: boolean };
+  filters: { priority?: string; sentiment?: string; status?: string; domain?: string };
   search: string;
   page: number;
   pageSize: number;
@@ -29,7 +29,6 @@ export const EmailList: React.FC<EmailListProps> = ({ onSelect, selectedId, filt
   if (filters.sentiment) queryParams.sentiment = filters.sentiment;
   if (filters.status) queryParams.status = filters.status;
   if (filters.domain) queryParams.domain = filters.domain;
-  if (filters.fuzzy) queryParams.fuzzy = 'true';
   if (search) queryParams.q = search;
   const queryString = new URLSearchParams(queryParams).toString();
   const { data, refetch, isLoading, error } = useQuery<any>(['emails', filters, search, page, pageSize, refreshKey], async () => {

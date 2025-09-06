@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from 'react-query';
 import axios from 'axios';
 
@@ -33,10 +33,32 @@ export const EmailDetail: React.FC<{ id: number | null }> = ({ id }) => {
   const { data, isLoading, error, refetch } = useQuery(['email', id], () => id ? fetchEmail(id) : Promise.resolve(null), {
     enabled: !!id,
     staleTime: 5000,
+    keepPreviousData: true,
+    refetchOnWindowFocus: false,
     retry: 1,
     onError: (e) => { /* optional logging */ console.warn('Email detail load error', e); }
   });
   const [isRegenerating, setIsRegenerating] = useState(false);
+  // Local SSE to refresh this detail when the backend updates this email
+  const sseRef = useRef<EventSource | null>(null);
+  useEffect(() => {
+    if (!id) return;
+    // create per-detail listener
+    const es = new EventSource('/api/events');
+    sseRef.current = es;
+    const onUpdate = (ev: MessageEvent) => {
+      try {
+        const j = JSON.parse(ev.data || '{}');
+        if (j && typeof j.id === 'number' && j.id === id) {
+          // Refresh this record only when it’s updated
+          qc.invalidateQueries(['email', id]);
+        }
+      } catch { /* ignore parse errors */ }
+    };
+    es.addEventListener('email_updated', onUpdate as any);
+    es.onerror = () => { es.close(); sseRef.current = null; };
+    return () => { es.removeEventListener('email_updated', onUpdate as any); es.close(); sseRef.current = null; };
+  }, [id, qc]);
 
   if (!id) return <div className="detail">Select an email from Sidebar.</div>;
   if (error) return <div className="detail" style={{color:'red', fontSize:'0.75rem'}}>
@@ -58,16 +80,21 @@ export const EmailDetail: React.FC<{ id: number | null }> = ({ id }) => {
     setIsRegenerating(true);
     try {
       const r = await axios.post(`/api/emails/${id}/regenerate`);
-      // Optimistically update the cache with fresh response
-      qc.setQueryData(['email', id], r.data);
-      // Refresh list view
+      const updated = r.data as EmailFull;
+      // Only overwrite local cache if server returned a non-empty draft
+      if (updated && updated.auto_response && updated.auto_response.trim().length > 0) {
+        qc.setQueryData(['email', id], updated);
+      }
+      // Always refresh list view counts/badges
       qc.invalidateQueries(['emails']);
+      // If no draft returned (likely enqueued due to rate limit), schedule a delayed refetch
+      if (!updated?.auto_response || updated.auto_response.trim().length === 0) {
+        setTimeout(() => { qc.invalidateQueries(['email', id]); }, 6000);
+      }
     } catch (e:any) {
       alert('Regenerate failed: ' + (e?.response?.data?.detail || e.message || 'unknown error'));
     } finally {
-      // Ensure a background refetch in case of any race conditions
-      qc.invalidateQueries(['email', id]);
-      qc.refetchQueries(['email', id]);
+      // Keep UI responsive; SSE or the delayed refetch above will update the view
       setIsRegenerating(false);
     }
   };

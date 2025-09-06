@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from .retrievers import fetch_any, get_runtime_provider
 from .nlp import analyze_sentiment, determine_priority, extract_info
 from .auto_responder import generate_response
+from .queue_worker import enqueue_email
 from ..db.database import SessionLocal
 from .email_service import create_email
 from .email_service import email_exists, email_exists_external
@@ -44,19 +45,24 @@ def _loop():
                 for m in mails:
                     sentiment = analyze_sentiment(m['body'])
                     priority = determine_priority(m['body'])
-                    auto_resp = generate_response(m['subject'], m['body'], sentiment, priority, [])
+                    # Do not call the LLM inline here to avoid bursts. Let the queue worker serialize calls.
+                    auto_resp = None
                     recv = _coerce_received(m.get('received_at'))
                     ext_id = m.get('external_id')
                     if ext_id and email_exists_external(db, ext_id):
                         continue
                     if not ext_id and email_exists(db, m['sender'], m['subject'], recv):
                         continue
-                    create_email(db, EmailCreate(
+                    email = create_email(db, EmailCreate(
                         sender=m['sender'],
                         subject=m['subject'],
                         body=m['body'],
                         received_at=recv
                         ), sentiment, priority, auto_resp, source=provider, external_id=ext_id)
+                    try:
+                        enqueue_email(email.id, priority)
+                    except Exception:
+                        pass
                 db.close()
                 log.info("fetch_cycle", extra={"provider":provider, "fetched":len(mails)})
                 last_fetch_summary.update({
